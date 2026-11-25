@@ -1,0 +1,198 @@
+{
+  "schema_version": "1.0",
+  "title": "Гипотезы различения моделей потоков событий",
+  "source_implementation": {
+    "method": "maximum_likelihood_with_BIC",
+    "interval_source": [
+      "interarrival_time",
+      "event_time"
+    ],
+    "preprocessing": [
+      "использовать interarrival_time, если столбец присутствует; иначе отсортировать event_time и вычислить первые разности",
+      "оставить только конечные положительные интервалы",
+      "исключить первый интервал, если после фильтрации осталось более одного интервала"
+    ],
+    "parameter_counts": {
+      "Gamma": 2,
+      "Weibull": 2,
+      "MMPP-2": 4,
+      "MMPP-3": 9,
+      "MAP-2": 6
+    },
+    "bic_formula": "BIC = -2 * log_likelihood + k * ln(n)",
+    "selection_rule": "Выбрать модель с единственным минимальным BIC среди пяти кандидатов."
+  },
+  "feature_definitions": {
+    "renewal_structure": "Межсобытийные интервалы моделируются как независимые одинаково распределённые величины.",
+    "markov_modulation": "Интенсивность событий зависит от скрытого состояния непрерывной марковской цепи.",
+    "event_induced_state_transition": "Событие может сопровождаться переходом скрытого состояния; для MAP матрица D1 может иметь внедиагональные элементы.",
+    "serial_dependence": "Зависимость между соседними и более удалёнными межсобытийными интервалами.",
+    "bic": "Критерий сравнения максимизированных правдоподобий с учётом числа параметров."
+  },
+  "hypotheses": [
+    {
+      "id": "H1",
+      "model": "Gamma",
+      "class": "renewal",
+      "statement": "Межсобытийные интервалы образуют рекуррентный поток и описываются распределением Гамма.",
+      "structural_signature": {
+        "renewal_structure": true,
+        "interval_distribution": "Gamma(shape > 0, scale > 0)",
+        "hidden_markov_states": 0,
+        "event_induced_state_transition": false
+      },
+      "estimated_parameters": [
+        "shape",
+        "scale"
+      ],
+      "implementation": "scipy.stats.gamma.fit(x, floc=0)",
+      "parameter_count": 2,
+      "model_score": "BIC_Gamma",
+      "operational_acceptance": "BIC_Gamma — единственный минимум среди пяти BIC."
+    },
+    {
+      "id": "H2",
+      "model": "Weibull",
+      "class": "renewal",
+      "statement": "Межсобытийные интервалы образуют рекуррентный поток и описываются распределением Вейбулла.",
+      "structural_signature": {
+        "renewal_structure": true,
+        "interval_distribution": "Weibull(shape > 0, scale > 0)",
+        "hidden_markov_states": 0,
+        "event_induced_state_transition": false
+      },
+      "estimated_parameters": [
+        "shape",
+        "scale"
+      ],
+      "implementation": "scipy.stats.weibull_min.fit(x, floc=0)",
+      "parameter_count": 2,
+      "model_score": "BIC_Weibull",
+      "operational_acceptance": "BIC_Weibull — единственный минимум среди пяти BIC."
+    },
+    {
+      "id": "H3",
+      "model": "MMPP-2",
+      "class": "markov_modulated_poisson",
+      "statement": "Поток является пуассоновским с интенсивностью, переключающейся между двумя скрытыми состояниями непрерывной марковской цепи.",
+      "structural_signature": {
+        "renewal_structure": false,
+        "hidden_markov_states": 2,
+        "event_matrix_D1": "diagonal",
+        "event_induced_state_transition": false
+      },
+      "estimated_parameters": [
+        "q12",
+        "q21",
+        "lambda1",
+        "lambda2"
+      ],
+      "parameter_count": 4,
+      "matrix_constraints": {
+        "D0": "Q - Lambda",
+        "D1": "Lambda",
+        "Lambda": "diag(lambda1, lambda2)"
+      },
+      "model_score": "BIC_MMPP2",
+      "operational_acceptance": "BIC_MMPP2 — единственный минимум среди пяти BIC."
+    },
+    {
+      "id": "H4",
+      "model": "MMPP-3",
+      "class": "markov_modulated_poisson",
+      "statement": "Поток является пуассоновским с интенсивностью, переключающейся между тремя скрытыми состояниями непрерывной марковской цепи.",
+      "structural_signature": {
+        "renewal_structure": false,
+        "hidden_markov_states": 3,
+        "event_matrix_D1": "diagonal",
+        "event_induced_state_transition": false
+      },
+      "estimated_parameters": [
+        "q12",
+        "q13",
+        "q21",
+        "q23",
+        "q31",
+        "q32",
+        "lambda1",
+        "lambda2",
+        "lambda3"
+      ],
+      "parameter_count": 9,
+      "matrix_constraints": {
+        "D0": "Q - Lambda",
+        "D1": "Lambda",
+        "Lambda": "diag(lambda1, lambda2, lambda3)"
+      },
+      "model_score": "BIC_MMPP3",
+      "operational_acceptance": "BIC_MMPP3 — единственный минимум среди пяти BIC."
+    },
+    {
+      "id": "H5",
+      "model": "MAP-2",
+      "class": "markovian_arrival_process",
+      "statement": "Поток является MAP с двумя скрытыми состояниями; переход скрытого состояния может происходить как между событиями, так и в момент события.",
+      "structural_signature": {
+        "renewal_structure": false,
+        "hidden_markov_states": 2,
+        "event_matrix_D1": "may_be_nondiagonal",
+        "event_induced_state_transition": true
+      },
+      "estimated_parameters": [
+        "a",
+        "b",
+        "c1",
+        "c2",
+        "p1",
+        "p2"
+      ],
+      "parameter_count": 6,
+      "matrix_constraints": {
+        "D0": "[[-(a+c1), a], [b, -(b+c2)]]",
+        "D1": "[[c1*p1, c1*(1-p1)], [c2*(1-p2), c2*p2]]"
+      },
+      "model_score": "BIC_MAP2",
+      "operational_acceptance": "BIC_MAP2 — единственный минимум среди пяти BIC."
+    }
+  ],
+  "decision_protocol": {
+    "candidate_models": [
+      "Gamma",
+      "Weibull",
+      "MMPP-2",
+      "MMPP-3",
+      "MAP-2"
+    ],
+    "primary_discriminator": "Минимальный BIC среди пяти оценённых моделей.",
+    "unique_selection": {
+      "rule": "Выбор однозначен, если ровно одна модель имеет минимальный BIC.",
+      "tie_rule": "При совпадении минимумов в пределах допуска результат помечается как неоднозначный; нельзя присваивать модель по порядку списка.",
+      "recommended_numeric_tolerance": 1e-08
+    },
+    "delta_bic_interpretation": [
+      {
+        "range": "0–2",
+        "meaning": "различие с лучшей моделью слабое"
+      },
+      {
+        "range": "2–6",
+        "meaning": "умеренное свидетельство против модели"
+      },
+      {
+        "range": "6–10",
+        "meaning": "сильное свидетельство против модели"
+      },
+      {
+        "range": ">10",
+        "meaning": "очень сильное свидетельство против модели"
+      }
+    ]
+  },
+  "limitations": [
+    "Гипотезы — кандидатные семейства моделей; они не являются гарантированно различимыми на любой конечной трассе.",
+    "Gamma и Weibull пересекаются: экспоненциальное распределение является частным случаем обоих семейств при параметре формы 1.",
+    "MMPP-2, MMPP-3 и MAP-2 могут давать близкие распределения наблюдаемых интервалов; полезны автокорреляция интервалов и остаточная диагностика.",
+    "Минимальный BIC даёт операциональный выбор среди заданных кандидатов, но не доказывает истинность выбранного механизма.",
+    "Сопоставимость BIC зависит от корректности и сопоставимости функций правдоподобия."
+  ]
+}
